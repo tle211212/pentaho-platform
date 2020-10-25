@@ -191,7 +191,7 @@
     <div id="login-form-container" class="lang_<%=cleanedLang%>">
       <div id="animate-wrapper">
         <h1><%=Messages.getInstance().getString("UI.PUC.LOGIN.TITLE")%></h1>
-        <form name="login" id="login" action="j_spring_security_check" method="POST" onkeyup="if(window.event && window.event.keyCode && window.event.keyCode==13){var buttonToClick = document.getElementById('loginbtn'); if(buttonToClick){ buttonToClick.click();}}">
+        <form name="login" id="login" onkeyup="if(window.event && window.event.keyCode && window.event.keyCode==13){var buttonToClick = document.getElementById('loginbtn'); if(buttonToClick){ doLogin();}}">
           <div class="row-fluid nowrap">
             <div class="input-container">
               <label><%=Messages.getInstance().getString("UI.PUC.LOGIN.USERNAME")%></label>
@@ -308,12 +308,29 @@
 
   function doLogin() {
 
+    /* doLogin may be called concurrently due from login form submit
+     * and enter key event handler. This results in http session
+     * wrongly being invalidated. The effect is users repeatedly
+     * fail to login.
+     * A simple fix is to avoid concurrent calls to doLogin function
+     **/
+    if ( typeof doLogin.isRunning == 'undefined' ) {
+      doLogin.isRunning = false;
+    }
+
+    // doLogin is already being executed, so we quit.
+    if (doLogin.isRunning) {
+      return;
+    }
+    doLogin.isRunning = true;
+
     // if we have a valid session and we attempt to login on top of it, the server
     // will actually log us out and will not log in with the supplied credentials, you must
     // login again. So instead, if they're already logged in, we bounce out of here to
     // prevent confusion.
     if (<%=loggedIn%>) {
       bounceToReturnLocation();
+      doLogin.isRunning = false;
       return false;
     }
 
@@ -328,6 +345,7 @@
           // if we get a 404 it means login was successful but intended resource does not exist
           // just let it go - let the user get the 404
           bounceToReturnLocation();
+          doLogin.isRunning = false;
           return;
         }
         //Fix for BISERVER-7525
@@ -336,11 +354,13 @@
         if (xhr.status == 200 && thrownError == 'parsererror') {
           document.getElementById("j_password").value = "";
           bounceToReturnLocation();
+          doLogin.isRunning = false;
           return;
         }
         // fail
         $("#loginError").show();
         $("#loginError button").focus();
+        doLogin.isRunning = false;
       },
 
       success:function(data, textStatus, jqXHR){
@@ -348,6 +368,7 @@
           // fail
           $("#loginError").show();
           $("#loginError button").focus();
+          doLogin.isRunning = false;
           return false;
         } else {
           document.getElementById("j_password").value = "";
