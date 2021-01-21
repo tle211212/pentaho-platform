@@ -228,7 +228,13 @@ public class ZipExportProcessor extends BaseExportProcessor {
             ZipEntry entry = new ZipEntry( zipEntryName );
             zos.putNextEntry( entry );
           }
-          exportDirectory( repositoryFile, outputStream, filePath );
+          // dinhnn: ignore if export directory have exceptions
+          try {
+            exportDirectory( repositoryFile, outputStream, filePath );
+          } catch (Exception ex) {
+            log.debug("Directory = " + repositoryFile.getPath() + " can not export");
+            log.debug( ex.getMessage(), ex );  
+          }
         } else {
           try {
             exportFile( repositoryFile, outputStream, filePath );
@@ -380,7 +386,14 @@ public class ZipExportProcessor extends BaseExportProcessor {
    */
   private InputStream createLocaleFile( String name, Properties properties, String locale ) throws IOException {
     if ( properties != null ) {
-      File localeFile = File.createTempFile( ExportFileNameEncoder.encodeZipFileName( name ), LOCALE_EXT );
+      // dinhnn: trim string if length exceed limit
+      String encodedFileName = ExportFileNameEncoder.encodeZipFileName( name );
+      if (encodedFileName != null) {
+          // 19 = digit length generate by temp file
+          encodedFileName = encodedFileName.substring(0, Math.min(encodedFileName.length(), 255 - 19 - LOCALE_EXT.length()));
+      }
+        
+      File localeFile = File.createTempFile(encodedFileName, LOCALE_EXT );
       localeFile.deleteOnExit();
 
       try ( FileOutputStream fileOut = new FileOutputStream( localeFile ) ) {
